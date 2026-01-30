@@ -99,24 +99,37 @@ function createGeometry(vertices)
 // Inicjalizacja brył
 function initGeometries() 
 {
-  geometries.cube = createGeometry(createCube());
+  geometries.cube = createGeometry(createCube(2));
   geometries.sphere = createGeometry(createSphere(16, 16));
-  geometries.cone = createGeometry(createCone(20));
-  geometries.cylinder = createGeometry(createCylinder(20));
+  geometries.cone = createGeometry(createCone(1,2,20));
+  geometries.cylinder = createGeometry(createCylinder(1,2,20));
 }
 
 //generuje wierzchołki bryły sześcianu
-function createCube() 
+function createCube(size) 
 {
+  const s = size / 2;
   return [
-    -1,-1, 1,  1,-1, 1,  1, 1, 1,  -1,-1, 1,  1, 1, 1, -1, 1, 1,
-    -1,-1,-1, -1, 1,-1,  1, 1,-1, -1,-1,-1,  1, 1,-1,  1,-1,-1,
-    -1, 1,-1, -1, 1, 1,  1, 1, 1,  -1, 1,-1,  1, 1, 1,  1, 1,-1,
-    -1,-1,-1,  1,-1,-1,  1,-1, 1, -1,-1,-1,  1,-1, 1, -1,-1, 1,
-     1,-1,-1,  1, 1,-1,  1, 1, 1,  1,-1,-1,  1, 1, 1,  1,-1, 1,
-    -1,-1,-1, -1,-1, 1, -1, 1, 1, -1,-1,-1, -1, 1, 1, -1, 1,-1
+    // dolna podstawa
+    -s,-s,-s,  s,-s,-s,
+     s,-s,-s,  s,-s, s,
+     s,-s, s, -s,-s, s,
+    -s,-s, s, -s,-s,-s,
+
+    // górna podstawa
+    -s, s,-s,  s, s,-s,
+     s, s,-s,  s, s, s,
+     s, s, s, -s, s, s,
+    -s, s, s, -s, s,-s,
+
+    // pionowe krawędzie
+    -s,-s,-s, -s, s,-s,
+     s,-s,-s,  s, s,-s,
+     s,-s, s,  s, s, s,
+    -s,-s, s, -s, s, s
   ];
 }
+
 
 //generuje wierzchołki bryły sfery
 function createSphere(lat, lon) 
@@ -153,62 +166,102 @@ function sph(t, p)
 }
 
 //generuje wierzchołki bryły stożka
-function createCone(segments) 
+function createCone(radius, height, segments) 
 {
-  const v = [];
-  for (let i = 0; i < segments; i++) 
-  {
-    const a = i * 2 * Math.PI / segments;
-    const b = (i + 1) * 2 * Math.PI / segments;
+ const v = [];
 
-    v.push(
-      0,1,0,
-      Math.cos(a),-1,Math.sin(a),
-      Math.cos(b),-1,Math.sin(b)
-    );
+  const top = [0, height / 2, 0];
+  const center = [0, -height / 2, 0];
+  const y = -height / 2;
+
+  let firstX = null;
+  let firstZ = null;
+  let prevX = null;
+  let prevZ = null;
+
+  for (let i = 0; i <= segments; i++) {
+    const a = i / segments * Math.PI * 2;
+    const x = Math.cos(a) * radius;
+    const z = Math.sin(a) * radius;
+
+    // krawędź boczna (wierzchołek i podstawa)
+    v.push(...top, x, y, z);
+
+    // promień podstawy (środek i punkt okręgu)
+    v.push(...center, x, y, z);
+
+    // obwód podstawy
+    if (prevX !== null) {
+      v.push(prevX, y, prevZ, x, y, z);
+    } else {
+      firstX = x;
+      firstZ = z;
+    }
+
+    prevX = x;
+    prevZ = z;
   }
+
+  // domknięcie okręgu podstawy
+  v.push(prevX, y, prevZ, firstX, y, firstZ);
+
   return v;
 }
 
 //generuje wierzchołki bryły walca
-function createCylinder(segments) 
+function createCylinder(radius, height, segments)
 {
   const v = [];
 
-  // Ściana boczna
-  for (let i = 0; i < segments; i++) 
-  {
-    const a = i * 2 * Math.PI / segments;
-    const b = (i + 1) * 2 * Math.PI / segments;
+  const topY = height / 2;
+  const botY = -height / 2;
 
-    const x1 = Math.cos(a), z1 = Math.sin(a);
-    const x2 = Math.cos(b), z2 = Math.sin(b);
+  const topCenter = [0, topY, 0];
+  const botCenter = [0, botY, 0];
 
-    v.push(
-      x1,1,z1, x1,-1,z1, x2,-1,z2,
-      x1,1,z1, x2,-1,z2, x2,1,z2
-    );
+  let firstTop = null;
+  let firstBot = null;
+  let prevTop = null;
+  let prevBot = null;
+
+  for (let i = 0; i <= segments; i++) {
+    const a = i / segments * Math.PI * 2;
+    const x = Math.cos(a) * radius;
+    const z = Math.sin(a) * radius;
+
+    const top = [x, topY, z];
+    const bot = [x, botY, z];
+
+    // krawędź pionowa
+    v.push(...top, ...bot);
+
+    // promień górnej podstawy
+    v.push(...topCenter, ...top);
+
+    // promień dolnej podstawy
+    v.push(...botCenter, ...bot);
+
+    // obwód górny
+    if (prevTop) {
+      v.push(...prevTop, ...top);
+    } else {
+      firstTop = top;
+    }
+
+    // obwód dolny
+    if (prevBot) {
+      v.push(...prevBot, ...bot);
+    } else {
+      firstBot = bot;
+    }
+
+    prevTop = top;
+    prevBot = bot;
   }
 
-  // Pokrywa górna
-  for (let i = 0; i < segments; i++) 
-  {
-    const a = i * 2 * Math.PI / segments;
-    const b = (i + 1) * 2 * Math.PI / segments;
-    v.push(
-      0,1,0, Math.cos(a),1,Math.sin(a), Math.cos(b),1,Math.sin(b)
-    );
-  }
-
-  // Pokrywa dolna
-  for (let i = 0; i < segments; i++) 
-  {
-    const a = i * 2 * Math.PI / segments;
-    const b = (i + 1) * 2 * Math.PI / segments;
-    v.push(
-      0,-1,0, Math.cos(b),-1,Math.sin(b), Math.cos(a),-1,Math.sin(a)
-    );
-  }
+  // domknięcie okręgów
+  v.push(...prevTop, ...firstTop);
+  v.push(...prevBot, ...firstBot);
 
   return v;
 }
@@ -312,7 +365,7 @@ function draw()
     mat4.multiply(mvp, proj, mvp);
 
     gl.uniformMatrix4fv(uMVP, false, mvp);
-    gl.drawArrays(gl.TRIANGLES, 0, g.count);
+    gl.drawArrays(gl.LINES, 0, g.count);
   }
 }
 
